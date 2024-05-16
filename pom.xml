@@ -4,10 +4,14 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.github.codert96</groupId>
+    <groupId>io.github.codert96</groupId>
     <artifactId>spring-boot-starter-minio</artifactId>
     <version>8.5.10</version>
 
+    <url>https://github.com/codert96/spring-boot-starter-minio</url>
+    <description>
+        spring-boot-starter-minio
+    </description>
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
@@ -20,6 +24,32 @@
             <url>https://oss.sonatype.org/content/repositories/releases/</url>
         </repository>
     </repositories>
+    <licenses>
+        <license>
+            <name>The Apache Software License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
+    <developers>
+        <developer>
+            <name>codert96</name>
+            <email>tangj9604@gmail.com</email>
+            <url>https://github.com/codert96</url>
+        </developer>
+    </developers>
+    <scm>
+        <url>https://github.com/codert96/spring-boot-starter-minio</url>
+        <connection>https://github.com/codert96/spring-boot-starter-minio.git</connection>
+        <developerConnection>https://github.com/codert96</developerConnection>
+    </scm>
+    <distributionManagement>
+        <repository>
+            <id>central</id>
+            <name>central-releases</name>
+            <url>https://s01.oss.sonatype.org/</url>
+        </repository>
+    </distributionManagement>
+
     <dependencies>
         <!-- https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-web -->
         <dependency>
@@ -43,5 +73,65 @@
             <optional>true</optional>
         </dependency>
     </dependencies>
-
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
+                <version>0.4.0</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <publishingServerId>central</publishingServerId>
+                    <tokenAuth>true</tokenAuth>
+                    <autoPublish>true</autoPublish>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>3.2.1</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>3.6.3</version>
+                <executions>
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-gpg-plugin</artifactId>
+                <version>3.2.4</version>
+                <executions>
+                    <execution>
+                        <id>sign-artifacts</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>sign</goal>
+                        </goals>
+                        <configuration>
+                            <gpgArguments>
+                                <arg>--pinentry-mode</arg>
+                                <arg>loopback</arg>
+                            </gpgArguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>
