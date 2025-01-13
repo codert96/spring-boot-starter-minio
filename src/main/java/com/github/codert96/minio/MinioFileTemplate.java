@@ -64,8 +64,8 @@ public class MinioFileTemplate implements InitializingBean {
                     PutObjectArgs.builder()
                             .bucket(bucketName)
                             .object(fileId)
-                            .stream(inputStream, -1, MIN_PART_SIZE)
                             .userMetadata(Map.of("original-filename", filename))
+                            .stream(inputStream, -1, MIN_PART_SIZE)
                             .build()
             );
         }
@@ -79,6 +79,7 @@ public class MinioFileTemplate implements InitializingBean {
                             .bucket(bucketName)
                             .object(objectName)
                             .contentType(multipartFile.getContentType())
+                            .userMetadata(Map.of("original-filename", Objects.requireNonNull(multipartFile.getOriginalFilename())))
                             .stream(inputStream, multipartFile.getSize(), -1)
                             .build()
             );
