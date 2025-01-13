@@ -117,7 +117,6 @@ public class MinioFileTemplate implements InitializingBean {
                                 .filter(s -> !UNNECESSARY_HEADERS.contains(s))
                                 .forEach(s -> requestHeaders.addAll(s, Collections.list(httpServletRequest.getHeaders(s))))
                 );
-        UNNECESSARY_HEADERS.forEach(requestHeaders::remove);
         GetObjectResponse objectResponse = minioClient.getObject(
                 GetObjectArgs.builder()
                         .bucket(bucketName)
