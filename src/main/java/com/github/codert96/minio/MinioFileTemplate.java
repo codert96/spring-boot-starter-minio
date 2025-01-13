@@ -152,13 +152,11 @@ public class MinioFileTemplate implements InitializingBean {
     }
 
     private String getFilename(String filename) {
-        UUID uuid = UUID_GENERATOR.generate();
-        String string = Base64.getUrlEncoder().encodeToString(uuid.toString().getBytes());
         String ext = Optional.ofNullable(filename)
                 .map(FilenameUtils::getExtension)
                 .map("."::concat)
                 .orElse("");
-        return "%s%s".formatted(string, ext);
+        return "%s%s".formatted(UUID_GENERATOR.generate(), ext);
     }
 
     @Override
