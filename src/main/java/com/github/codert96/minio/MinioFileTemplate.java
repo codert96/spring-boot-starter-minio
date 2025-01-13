@@ -1,20 +1,22 @@
 package com.github.codert96.minio;
 
+import com.fasterxml.uuid.Generators;
+import com.fasterxml.uuid.impl.TimeBasedGenerator;
 import io.minio.*;
 import lombok.RequiredArgsConstructor;
 import okhttp3.Headers;
 import org.apache.commons.io.FilenameUtils;
 import org.springframework.beans.factory.InitializingBean;
-import org.springframework.core.io.InputStreamResource;
-import org.springframework.core.io.Resource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.StreamUtils;
 import org.springframework.util.unit.DataSize;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import java.io.InputStream;
 import java.net.URLEncoder;
@@ -33,6 +35,8 @@ public class MinioFileTemplate implements InitializingBean {
             HttpHeaders.SERVER
     );
     private static final long MIN_PART_SIZE = DataSize.ofMegabytes(5).toBytes();
+    private static final TimeBasedGenerator UUID_GENERATOR = Generators.timeBasedGenerator();
+
     private final MinioClient minioClient;
     private final String bucketName;
 
@@ -96,23 +100,23 @@ public class MinioFileTemplate implements InitializingBean {
         return objectName;
     }
 
-    public ResponseEntity<Resource> download(String objectName) throws Exception {
+    public ResponseEntity<StreamingResponseBody> download(String objectName) throws Exception {
         HttpHeaders requestHeaders = new HttpHeaders();
         Optional.ofNullable(RequestContextHolder.getRequestAttributes())
                 .map(ServletRequestAttributes.class::cast)
                 .map(ServletRequestAttributes::getRequest)
-                .ifPresent(httpServletRequest -> {
-                    Iterator<String> iterator = httpServletRequest.getHeaderNames().asIterator();
-                    StreamSupport.stream(Spliterators.spliteratorUnknownSize(iterator, Spliterator.ORDERED), false)
-                            .forEach(s -> {
-                                Iterator<String> stringIterator = httpServletRequest.getHeaders(s).asIterator();
-                                List<String> list = StreamSupport.stream(Spliterators.spliteratorUnknownSize(stringIterator, Spliterator.ORDERED), false).toList();
-                                requestHeaders.addAll(s, list);
-                            });
-                });
-
+                .ifPresent(httpServletRequest ->
+                        StreamSupport.stream(
+                                        Spliterators.spliteratorUnknownSize(
+                                                httpServletRequest.getHeaderNames().asIterator(),
+                                                Spliterator.ORDERED
+                                        ),
+                                        false
+                                )
+                                .filter(s -> !UNNECESSARY_HEADERS.contains(s))
+                                .forEach(s -> requestHeaders.addAll(s, Collections.list(httpServletRequest.getHeaders(s))))
+                );
         UNNECESSARY_HEADERS.forEach(requestHeaders::remove);
-
         GetObjectResponse objectResponse = minioClient.getObject(
                 GetObjectArgs.builder()
                         .bucket(bucketName)
@@ -121,37 +125,34 @@ public class MinioFileTemplate implements InitializingBean {
                         .build()
         );
         Headers objectResponseHeaders = objectResponse.headers();
-        String filename = Optional.ofNullable(objectResponseHeaders.get("x-amz-meta-original-filename")).orElse(objectName);
-
         HttpHeaders responseHeaders = new HttpHeaders();
-
         responseHeaders.putAll(objectResponseHeaders.toMultimap());
         UNNECESSARY_HEADERS.forEach(responseHeaders::remove);
         responseHeaders.setContentDisposition(
-                ContentDisposition.inline().filename(URLEncoder.encode(filename, StandardCharsets.UTF_8)).build()
+                ContentDisposition.inline()
+                        .filename(
+                                URLEncoder.encode(
+                                                Optional.ofNullable(objectResponseHeaders.get("x-amz-meta-original-filename")).orElse(objectName),
+                                                StandardCharsets.UTF_8
+                                        )
+                                        .replace("+", "%20")
+                        )
+                        .build()
         );
-        List<String> list = responseHeaders.keySet().stream().filter(strings -> strings.startsWith("x-amz")).toList();
-        list.forEach(responseHeaders::remove);
-        HttpStatus httpStatus = responseHeaders.containsKey(HttpHeaders.CONTENT_RANGE) ? HttpStatus.PARTIAL_CONTENT : HttpStatus.OK;
-        long contentLength = responseHeaders.getContentLength();
+        responseHeaders.keySet().stream().filter(strings -> strings.startsWith("x-amz")).forEach(responseHeaders::remove);
         return ResponseEntity
-                .status(httpStatus)
+                .status(responseHeaders.containsKey(HttpHeaders.CONTENT_RANGE) ? HttpStatus.PARTIAL_CONTENT : HttpStatus.OK)
                 .headers(responseHeaders)
-                .body(new InputStreamResource(objectResponse) {
-                    @Override
-                    public String getFilename() {
-                        return filename;
-                    }
-
-                    @Override
-                    public long contentLength() {
-                        return contentLength;
+                .body(outputStream -> {
+                    try (objectResponse) {
+                        StreamUtils.copy(objectResponse, outputStream);
                     }
                 });
     }
 
     private String getFilename(String filename) {
-        String string = Base64.getUrlEncoder().encodeToString(UUID.randomUUID().toString().getBytes(StandardCharsets.UTF_8));
+        UUID uuid = UUID_GENERATOR.generate();
+        String string = Base64.getUrlEncoder().encodeToString(uuid.toString().getBytes());
         String ext = Optional.ofNullable(filename)
                 .map(FilenameUtils::getExtension)
                 .map("."::concat)
