@@ -6,7 +6,7 @@
 
     <groupId>io.github.codert96</groupId>
     <artifactId>spring-boot-starter-minio</artifactId>
-    <version>8.5.10</version>
+    <version>8.5.15</version>
 
     <url>https://github.com/codert96/spring-boot-starter-minio</url>
     <description>
@@ -16,7 +16,7 @@
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <minio.version>8.5.10</minio.version>
+        <minio.version>8.5.15</minio.version>
     </properties>
     <repositories>
         <repository>
