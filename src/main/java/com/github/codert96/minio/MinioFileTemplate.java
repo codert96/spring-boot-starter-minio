@@ -141,6 +141,8 @@ public class MinioFileTemplate implements InitializingBean {
                     if (Objects.nonNull(t)) {
                         log.error(t.getMessage(), t);
                         sseEmitter.completeWithError(t);
+                        CACHED_EMITTERS.remove(filename);
+                        cleanUp(tempFile, tempDirectory);
                         return;
                     }
                     try (Stream<Path> directoryStream = Files.list(tempDirectory)) {
