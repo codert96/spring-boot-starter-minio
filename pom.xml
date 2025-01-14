@@ -6,7 +6,7 @@
 
     <groupId>io.github.codert96</groupId>
     <artifactId>spring-boot-starter-minio</artifactId>
-    <version>8.5.16</version>
+    <version>8.5.17</version>
 
     <url>https://github.com/codert96/spring-boot-starter-minio</url>
     <description>

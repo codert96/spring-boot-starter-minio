@@ -7,8 +7,8 @@ import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
 import com.github.kokorin.jaffree.ffmpeg.UrlInput;
 import com.github.kokorin.jaffree.ffmpeg.UrlOutput;
 import io.minio.*;
-import io.minio.errors.*;
-import io.minio.messages.ErrorResponse;
+import io.minio.errors.MinioException;
+import io.minio.errors.ServerException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.Headers;
@@ -152,7 +152,7 @@ public class MinioFileTemplate implements InitializingBean {
                                                                 PutObjectArgs.builder()
                                                                         .bucket(minioConfigProperties.getBucket())
                                                                         .object(fileName)
-                                                                        .userMetadata(Map.of("original-filename", filename))
+                                                                        .userMetadata(Map.of("original-filename", fileName))
                                                                         .stream(inputStream, -1, MIN_PART_SIZE)
                                                                         .build()
                                                         );
