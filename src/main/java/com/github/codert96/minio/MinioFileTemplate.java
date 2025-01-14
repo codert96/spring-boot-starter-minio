@@ -106,12 +106,20 @@ public class MinioFileTemplate implements InitializingBean {
         }
         UUID uuid = UUID_GENERATOR.generate();
         String filename = "%s.m3u8".formatted(uuid);
-        SseEmitter sseEmitter = new SseEmitter();
-        CACHED_EMITTERS.put(filename, sseEmitter);
         String originalFilename = multipartFile.getOriginalFilename();
         Path tempFile = Files.createTempFile("m3u8_", originalFilename);
         multipartFile.transferTo(tempFile);
         Path tempDirectory = Files.createTempDirectory("m3u8_");
+
+        SseEmitter sseEmitter = new SseEmitter();
+        CACHED_EMITTERS.put(filename, sseEmitter);
+        Runnable runnable = () -> {
+            CACHED_EMITTERS.remove(filename);
+            cleanUp(tempFile, tempDirectory);
+        };
+        sseEmitter.onCompletion(runnable);
+        sseEmitter.onTimeout(runnable);
+        sseEmitter.onError(throwable -> runnable.run());
         Consumer<SseEmitter.SseEventBuilder> sender = sseEventBuilder -> {
             try {
                 sseEmitter.send(sseEventBuilder);
@@ -119,6 +127,7 @@ public class MinioFileTemplate implements InitializingBean {
                 log.error(ex.getMessage(), ex);
             }
         };
+
         StopWatch stopWatch = new StopWatch();
         stopWatch.start();
         FFmpeg.atPath(Paths.get(minioConfigProperties.getFfmpegPath()))
@@ -141,12 +150,12 @@ public class MinioFileTemplate implements InitializingBean {
                     if (Objects.nonNull(t)) {
                         log.error(t.getMessage(), t);
                         sseEmitter.completeWithError(t);
-                        CACHED_EMITTERS.remove(filename);
-                        cleanUp(tempFile, tempDirectory);
                         return;
                     }
                     try (Stream<Path> directoryStream = Files.list(tempDirectory)) {
-                        CompletableFuture<?>[] array = directoryStream.map(path ->
+                        CompletableFuture<?>[] array = directoryStream
+                                .sorted(Comparator.naturalOrder())
+                                .map(path ->
                                         CompletableFuture.supplyAsync(() -> {
                                                     String fileName = path.getFileName().toString();
                                                     try (InputStream inputStream = Files.newInputStream(path)) {
@@ -165,20 +174,20 @@ public class MinioFileTemplate implements InitializingBean {
                                                 }
                                         )
                                 )
-                                .peek(stringCompletableFuture -> {
-                                    stringCompletableFuture.whenCompleteAsync((part, e) -> {
-                                        sender.accept(SseEmitter.event()
-                                                .name("saving")
-                                                .data(Map.of(
-                                                                "filename", filename,
-                                                                "part", part,
-                                                                "error", Optional.ofNullable(e).map(Throwable::getMessage).orElse("")
-                                                        ),
-                                                        MediaType.APPLICATION_JSON
+                                .peek(stringCompletableFuture ->
+                                        stringCompletableFuture.whenCompleteAsync((part, e) ->
+                                                sender.accept(SseEmitter.event()
+                                                        .name("saving")
+                                                        .data(Map.of(
+                                                                        "filename", filename,
+                                                                        "part", part,
+                                                                        "error", Optional.ofNullable(e).map(Throwable::getMessage).orElse("")
+                                                                ),
+                                                                MediaType.APPLICATION_JSON
+                                                        )
                                                 )
-                                        );
-                                    });
-                                })
+                                        )
+                                )
                                 .toArray(CompletableFuture[]::new);
                         CompletableFuture.allOf(array)
                                 .whenComplete((unused, throwable) -> {
@@ -199,8 +208,6 @@ public class MinioFileTemplate implements InitializingBean {
                                                 );
                                                 sseEmitter.complete();
                                             }
-                                            CACHED_EMITTERS.remove(filename);
-                                            cleanUp(tempFile, tempDirectory);
                                         }
                                 );
                     } catch (IOException e) {
@@ -213,10 +220,12 @@ public class MinioFileTemplate implements InitializingBean {
     private void cleanUp(Path tempFile, Path tempDirectory) {
         try {
             Files.deleteIfExists(tempFile);
-            try (Stream<Path> stream = Files.walk(tempDirectory)) {
-                stream.sorted(Comparator.reverseOrder())
+            log.debug("Deleted file: {}", tempFile);
+            try (Stream<Path> stream = Files.list(tempDirectory)) {
+                stream.sorted(Comparator.naturalOrder())
                         .forEach(path -> {
                             try {
+                                log.debug("Deleted file: {}", path);
                                 Files.deleteIfExists(path);
                             } catch (IOException e) {
                                 log.error("Failed to delete temp file: {}", path, e);
