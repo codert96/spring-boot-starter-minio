@@ -28,6 +28,6 @@ public class MinioConfig {
 
     @Bean
     public MinioFileTemplate minioFileTemplate(MinioClient minioClient) {
-        return new MinioFileTemplate(minioClient, minioConfigProperties.getBucket());
+        return new MinioFileTemplate(minioClient, minioConfigProperties);
     }
 }

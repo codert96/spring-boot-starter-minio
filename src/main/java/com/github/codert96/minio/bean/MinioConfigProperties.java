@@ -19,4 +19,5 @@ public class MinioConfigProperties {
 
     private String region;
 
+    private String ffmpegPath;
 }

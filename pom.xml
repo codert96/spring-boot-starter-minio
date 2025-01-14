@@ -6,7 +6,7 @@
 
     <groupId>io.github.codert96</groupId>
     <artifactId>spring-boot-starter-minio</artifactId>
-    <version>8.5.15</version>
+    <version>8.5.16</version>
 
     <url>https://github.com/codert96/spring-boot-starter-minio</url>
     <description>
@@ -70,7 +70,12 @@
             <artifactId>minio</artifactId>
             <version>${minio.version}</version>
         </dependency>
-
+        <!-- https://mvnrepository.com/artifact/com.github.kokorin.jaffree/jaffree -->
+        <dependency>
+            <groupId>com.github.kokorin.jaffree</groupId>
+            <artifactId>jaffree</artifactId>
+            <version>2024.08.29</version>
+        </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
