@@ -2,40 +2,40 @@
   "groups": [
     {
       "name": "minio",
-      "type": "com.github.codert96.minio.bean.MinioConfigProperties",
-      "sourceType": "com.github.codert96.minio.bean.MinioConfigProperties"
+      "type": "io.github.codert96.minio.bean.MinioConfigProperties",
+      "sourceType": "io.github.codert96.minio.bean.MinioConfigProperties"
     }
   ],
   "properties": [
     {
       "name": "minio.access-key",
       "type": "java.lang.String",
-      "sourceType": "com.github.codert96.minio.bean.MinioConfigProperties"
+      "sourceType": "io.github.codert96.minio.bean.MinioConfigProperties"
     },
     {
       "name": "minio.bucket",
       "type": "java.lang.String",
-      "sourceType": "com.github.codert96.minio.bean.MinioConfigProperties"
+      "sourceType": "io.github.codert96.minio.bean.MinioConfigProperties"
     },
     {
       "name": "minio.endpoint",
       "type": "java.lang.String",
-      "sourceType": "com.github.codert96.minio.bean.MinioConfigProperties"
+      "sourceType": "io.github.codert96.minio.bean.MinioConfigProperties"
     },
     {
       "name": "minio.region",
       "type": "java.lang.String",
-      "sourceType": "com.github.codert96.minio.bean.MinioConfigProperties"
+      "sourceType": "io.github.codert96.minio.bean.MinioConfigProperties"
     },
     {
       "name": "minio.secret-key",
       "type": "java.lang.String",
-      "sourceType": "com.github.codert96.minio.bean.MinioConfigProperties"
+      "sourceType": "io.github.codert96.minio.bean.MinioConfigProperties"
     },
     {
       "name": "minio.ffmpeg-path",
       "type": "java.lang.String",
-      "sourceType": "com.github.codert96.minio.bean.MinioConfigProperties"
+      "sourceType": "io.github.codert96.minio.bean.MinioConfigProperties"
     }
   ],
   "hints": []

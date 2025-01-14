@@ -1,8 +1,8 @@
-package com.github.codert96.minio.config;
+package io.github.codert96.minio.config;
 
 
-import com.github.codert96.minio.MinioFileTemplate;
-import com.github.codert96.minio.bean.MinioConfigProperties;
+import io.github.codert96.minio.MinioFileTemplate;
+import io.github.codert96.minio.bean.MinioConfigProperties;
 import io.minio.MinioClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;

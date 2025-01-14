@@ -1,11 +1,11 @@
-package com.github.codert96.minio;
+package io.github.codert96.minio;
 
 import com.fasterxml.uuid.Generators;
 import com.fasterxml.uuid.impl.TimeBasedGenerator;
-import com.github.codert96.minio.bean.MinioConfigProperties;
 import com.github.kokorin.jaffree.ffmpeg.FFmpeg;
 import com.github.kokorin.jaffree.ffmpeg.UrlInput;
 import com.github.kokorin.jaffree.ffmpeg.UrlOutput;
+import io.github.codert96.minio.bean.MinioConfigProperties;
 import io.minio.*;
 import io.minio.errors.MinioException;
 import io.minio.errors.ServerException;

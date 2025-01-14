@@ -1,4 +1,4 @@
-package com.github.codert96.minio.bean;
+package io.github.codert96.minio.bean;
 
 
 import lombok.Data;
