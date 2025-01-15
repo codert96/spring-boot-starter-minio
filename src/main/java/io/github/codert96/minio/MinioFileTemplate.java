@@ -232,6 +232,7 @@ public class MinioFileTemplate implements InitializingBean {
                             }
                         });
             }
+            Files.deleteIfExists(tempDirectory);
         } catch (IOException e) {
             log.error("Failed to clean up temporary files", e);
         }
