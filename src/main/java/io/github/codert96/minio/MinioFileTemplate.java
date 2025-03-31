@@ -36,7 +36,6 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -54,7 +53,6 @@ public class MinioFileTemplate implements InitializingBean {
     );
     private static final long MIN_PART_SIZE = DataSize.ofMegabytes(5).toBytes();
     private static final TimeBasedGenerator UUID_GENERATOR = Generators.timeBasedGenerator();
-    private static final Map<String, SseEmitter> CACHED_EMITTERS = new ConcurrentHashMap<>();
 
     private final MinioClient minioClient;
     private final MinioConfigProperties minioConfigProperties;
@@ -91,15 +89,7 @@ public class MinioFileTemplate implements InitializingBean {
         return fileId;
     }
 
-    public SseEmitter emitter(String fileId) {
-        return CACHED_EMITTERS.getOrDefault(fileId, new SseEmitter() {
-            {
-                complete();
-            }
-        });
-    }
-
-    public String uploadToMpeg(MultipartFile multipartFile) throws Exception {
+    public SseEmitter uploadToMpeg(MultipartFile multipartFile) throws Exception {
         String contentType = multipartFile.getContentType();
         if (!StringUtils.startsWith(contentType, "video/")) {
             throw new UnsupportedOperationException("Unsupported content type: " + contentType);
@@ -112,11 +102,7 @@ public class MinioFileTemplate implements InitializingBean {
         Path tempDirectory = Files.createTempDirectory("m3u8_");
 
         SseEmitter sseEmitter = new SseEmitter();
-        CACHED_EMITTERS.put(filename, sseEmitter);
-        Runnable runnable = () -> {
-            CACHED_EMITTERS.remove(filename);
-            cleanUp(tempFile, tempDirectory);
-        };
+        Runnable runnable = () -> cleanUp(tempFile, tempDirectory);
         sseEmitter.onCompletion(runnable);
         sseEmitter.onTimeout(runnable);
         sseEmitter.onError(throwable -> runnable.run());
@@ -214,7 +200,7 @@ public class MinioFileTemplate implements InitializingBean {
                         log.error(e.getMessage(), e);
                     }
                 });
-        return filename;
+        return sseEmitter;
     }
 
     private void cleanUp(Path tempFile, Path tempDirectory) {
