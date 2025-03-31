@@ -9,9 +9,10 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 @RequiredArgsConstructor
-@Configuration(proxyBeanMethods = false)
+@Configuration
 @EnableConfigurationProperties(MinioConfigProperties.class)
 @ConditionalOnProperty(prefix = "minio", name = "endpoint")
 public class MinioConfig {
@@ -27,7 +28,7 @@ public class MinioConfig {
     }
 
     @Bean
-    public MinioFileTemplate minioFileTemplate(MinioClient minioClient) {
-        return new MinioFileTemplate(minioClient, minioConfigProperties);
+    public MinioFileTemplate minioFileTemplate(ThreadPoolTaskExecutor threadPoolTaskExecutor) {
+        return new MinioFileTemplate(minioClient(), minioConfigProperties, threadPoolTaskExecutor);
     }
 }

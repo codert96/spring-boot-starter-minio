@@ -59,6 +59,7 @@ public class MinioFileTemplate implements InitializingBean {
     private final MinioConfigProperties minioConfigProperties;
 
     private final ThreadPoolTaskExecutor threadPoolTaskExecutor;
+
     public String upload(MultipartFile multipartFile) throws Exception {
         String fileId = getFilename(multipartFile.getOriginalFilename());
         String filename = Objects.requireNonNullElse(multipartFile.getOriginalFilename(), fileId);
