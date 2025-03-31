@@ -16,6 +16,7 @@ import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.http.*;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.util.StopWatch;
 import org.springframework.util.StreamUtils;
 import org.springframework.util.unit.DataSize;
@@ -57,6 +58,7 @@ public class MinioFileTemplate implements InitializingBean {
     private final MinioClient minioClient;
     private final MinioConfigProperties minioConfigProperties;
 
+    private final ThreadPoolTaskExecutor threadPoolTaskExecutor;
     public String upload(MultipartFile multipartFile) throws Exception {
         String fileId = getFilename(multipartFile.getOriginalFilename());
         String filename = Objects.requireNonNullElse(multipartFile.getOriginalFilename(), fileId);
@@ -130,7 +132,7 @@ public class MinioFileTemplate implements InitializingBean {
                                         .data(progress, MediaType.APPLICATION_JSON)
                         )
                 )
-                .executeAsync()
+                .executeAsync(threadPoolTaskExecutor)
                 .toCompletableFuture()
                 .whenCompleteAsync((fFmpegResult, t) -> {
                     if (Objects.nonNull(t)) {
@@ -157,7 +159,8 @@ public class MinioFileTemplate implements InitializingBean {
                                                     } catch (Exception e) {
                                                         throw new RuntimeException(e);
                                                     }
-                                                }
+                                                },
+                                                threadPoolTaskExecutor
                                         )
                                 )
                                 .peek(stringCompletableFuture ->
