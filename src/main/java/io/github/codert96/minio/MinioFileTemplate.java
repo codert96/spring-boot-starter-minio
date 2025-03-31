@@ -37,7 +37,7 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Consumer;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -109,16 +109,7 @@ public class MinioFileTemplate implements InitializingBean {
         sseEmitter.onCompletion(runnable);
         sseEmitter.onTimeout(runnable);
         sseEmitter.onError(throwable -> runnable.run());
-        Consumer<SseEmitter.SseEventBuilder> sender = sseEventBuilder -> {
-            try {
-                sseEmitter.send(sseEventBuilder);
-            } catch (IOException ex) {
-                log.error(ex.getMessage(), ex);
-            }
-        };
 
-        StopWatch stopWatch = new StopWatch();
-        stopWatch.start();
         FFmpeg.atPath(Paths.get(minioConfigProperties.getFfmpegPath()))
                 .addInput(UrlInput.fromPath(tempFile))
                 .addOutput(UrlOutput.toPath(Path.of(tempDirectory.toString(), "%s.m3u8".formatted(uuid)))
@@ -127,7 +118,8 @@ public class MinioFileTemplate implements InitializingBean {
                         .addArguments("-hls_list_size", "0")
                         .addArguments("-hls_segment_filename", Path.of(tempDirectory.toString(), "%s_%s.ts".formatted(uuid, "%03d")).toString()) // `.ts` 片段文件名
                 )
-                .setProgressListener(progress -> sender.accept(
+                .setProgressListener(progress -> send(
+                        sseEmitter,
                                 SseEmitter.event()
                                         .name("progress")
                                         .data(progress, MediaType.APPLICATION_JSON)
@@ -141,12 +133,22 @@ public class MinioFileTemplate implements InitializingBean {
                         sseEmitter.completeWithError(t);
                         return;
                     }
-                    uploadOss(tempDirectory, sender, filename, stopWatch, sseEmitter);
+                    uploadOss(tempDirectory, filename, sseEmitter);
                 });
         return sseEmitter;
     }
 
-    private void uploadOss(Path tempDirectory, Consumer<SseEmitter.SseEventBuilder> sender, String filename, StopWatch stopWatch, SseEmitter sseEmitter) {
+    private void send(SseEmitter sseEmitter, SseEmitter.SseEventBuilder sseEventBuilder) {
+        try {
+            sseEmitter.send(sseEventBuilder);
+        } catch (IOException ex) {
+            log.error(ex.getMessage(), ex);
+        }
+    }
+
+    private void uploadOss(Path tempDirectory, String filename, SseEmitter sseEmitter) {
+        StopWatch stopWatch = new StopWatch();
+        stopWatch.start();
         try (Stream<Path> directoryStream = Files.list(tempDirectory)) {
             CompletableFuture<?>[] array = directoryStream
                     .sorted(Comparator.naturalOrder())
@@ -172,15 +174,17 @@ public class MinioFileTemplate implements InitializingBean {
                     )
                     .peek(stringCompletableFuture ->
                             stringCompletableFuture.whenCompleteAsync((part, e) ->
-                                    sender.accept(SseEmitter.event()
-                                            .name("saving")
-                                            .data(Map.of(
-                                                            "filename", filename,
-                                                            "part", part,
-                                                            "error", Optional.ofNullable(e).map(Throwable::getMessage).orElse("")
-                                                    ),
-                                                    MediaType.APPLICATION_JSON
-                                            )
+                                    send(
+                                            sseEmitter,
+                                            SseEmitter.event()
+                                                    .name("saving")
+                                                    .data(Map.of(
+                                                                    "filename", filename,
+                                                                    "part", part,
+                                                                    "error", Optional.ofNullable(e).map(Throwable::getMessage).orElse("")
+                                                            ),
+                                                            MediaType.APPLICATION_JSON
+                                                    )
                                     )
                             )
                     )
@@ -188,10 +192,12 @@ public class MinioFileTemplate implements InitializingBean {
             CompletableFuture.allOf(array)
                     .whenComplete((unused, throwable) -> {
                                 stopWatch.stop();
+                        log.debug(stopWatch.prettyPrint(TimeUnit.MILLISECONDS));
                                 if (Objects.nonNull(throwable)) {
                                     sseEmitter.completeWithError(throwable);
                                 } else {
-                                    sender.accept(
+                                    send(
+                                            sseEmitter,
                                             SseEmitter.event()
                                                     .name("done")
                                                     .data(
