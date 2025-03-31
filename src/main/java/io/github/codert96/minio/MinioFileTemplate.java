@@ -141,70 +141,75 @@ public class MinioFileTemplate implements InitializingBean {
                         sseEmitter.completeWithError(t);
                         return;
                     }
-                    try (Stream<Path> directoryStream = Files.list(tempDirectory)) {
-                        CompletableFuture<?>[] array = directoryStream
-                                .sorted(Comparator.naturalOrder())
-                                .map(path ->
-                                        CompletableFuture.supplyAsync(() -> {
-                                                    String fileName = path.getFileName().toString();
-                                                    try (InputStream inputStream = Files.newInputStream(path)) {
-                                                        minioClient.putObject(
-                                                                PutObjectArgs.builder()
-                                                                        .bucket(minioConfigProperties.getBucket())
-                                                                        .object(fileName)
-                                                                        .userMetadata(Map.of("original-filename", fileName))
-                                                                        .stream(inputStream, -1, MIN_PART_SIZE)
-                                                                        .build()
-                                                        );
-                                                        return fileName;
-                                                    } catch (Exception e) {
-                                                        throw new RuntimeException(e);
-                                                    }
-                                                },
-                                                threadPoolTaskExecutor
-                                        )
-                                )
-                                .peek(stringCompletableFuture ->
-                                        stringCompletableFuture.whenCompleteAsync((part, e) ->
-                                                sender.accept(SseEmitter.event()
-                                                        .name("saving")
-                                                        .data(Map.of(
-                                                                        "filename", filename,
-                                                                        "part", part,
-                                                                        "error", Optional.ofNullable(e).map(Throwable::getMessage).orElse("")
-                                                                ),
-                                                                MediaType.APPLICATION_JSON
-                                                        )
-                                                )
-                                        )
-                                )
-                                .toArray(CompletableFuture[]::new);
-                        CompletableFuture.allOf(array)
-                                .whenComplete((unused, throwable) -> {
-                                            stopWatch.stop();
-                                            if (Objects.nonNull(throwable)) {
-                                                sseEmitter.completeWithError(throwable);
-                                            } else {
-                                                sender.accept(
-                                                        SseEmitter.event()
-                                                                .name("done")
-                                                                .data(
-                                                                        Map.of(
-                                                                                "filename", filename,
-                                                                                "totalTime", stopWatch.getTotalTimeSeconds()
-                                                                        ),
-                                                                        MediaType.APPLICATION_JSON
-                                                                )
-                                                );
-                                                sseEmitter.complete();
-                                            }
-                                        }
-                                );
-                    } catch (IOException e) {
-                        log.error(e.getMessage(), e);
-                    }
+                    uploadOss(tempDirectory, sender, filename, stopWatch, sseEmitter);
                 });
         return sseEmitter;
+    }
+
+    private void uploadOss(Path tempDirectory, Consumer<SseEmitter.SseEventBuilder> sender, String filename, StopWatch stopWatch, SseEmitter sseEmitter) {
+        try (Stream<Path> directoryStream = Files.list(tempDirectory)) {
+            CompletableFuture<?>[] array = directoryStream
+                    .sorted(Comparator.naturalOrder())
+                    .map(path ->
+                            CompletableFuture.supplyAsync(() -> {
+                                        String fileName = path.getFileName().toString();
+                                        try (InputStream inputStream = Files.newInputStream(path)) {
+                                            minioClient.putObject(
+                                                    PutObjectArgs.builder()
+                                                            .bucket(minioConfigProperties.getBucket())
+                                                            .object(fileName)
+                                                            .userMetadata(Map.of("original-filename", fileName))
+                                                            .stream(inputStream, -1, MIN_PART_SIZE)
+                                                            .build()
+                                            );
+                                            return fileName;
+                                        } catch (Exception e) {
+                                            throw new RuntimeException(e);
+                                        }
+                                    },
+                                    threadPoolTaskExecutor
+                            )
+                    )
+                    .peek(stringCompletableFuture ->
+                            stringCompletableFuture.whenCompleteAsync((part, e) ->
+                                    sender.accept(SseEmitter.event()
+                                            .name("saving")
+                                            .data(Map.of(
+                                                            "filename", filename,
+                                                            "part", part,
+                                                            "error", Optional.ofNullable(e).map(Throwable::getMessage).orElse("")
+                                                    ),
+                                                    MediaType.APPLICATION_JSON
+                                            )
+                                    )
+                            )
+                    )
+                    .toArray(CompletableFuture[]::new);
+            CompletableFuture.allOf(array)
+                    .whenComplete((unused, throwable) -> {
+                                stopWatch.stop();
+                                if (Objects.nonNull(throwable)) {
+                                    sseEmitter.completeWithError(throwable);
+                                } else {
+                                    sender.accept(
+                                            SseEmitter.event()
+                                                    .name("done")
+                                                    .data(
+                                                            Map.of(
+                                                                    "filename", filename,
+                                                                    "totalTime", stopWatch.getTotalTimeSeconds()
+                                                            ),
+                                                            MediaType.APPLICATION_JSON
+                                                    )
+                                    );
+                                    sseEmitter.complete();
+                                }
+                            }
+                    );
+        } catch (IOException e) {
+            log.error(e.getMessage(), e);
+            sseEmitter.completeWithError(e);
+        }
     }
 
     private void cleanUp(Path tempFile, Path tempDirectory) {
