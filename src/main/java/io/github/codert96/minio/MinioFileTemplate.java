@@ -46,11 +46,8 @@ import java.util.stream.StreamSupport;
 @SuppressWarnings("unused")
 public class MinioFileTemplate implements InitializingBean {
     private static final List<String> UNNECESSARY_HEADERS = Arrays.asList(
-            HttpHeaders.COOKIE,
-            HttpHeaders.AUTHORIZATION,
-            HttpHeaders.SERVER,
-            HttpHeaders.SET_COOKIE,
-            HttpHeaders.SERVER
+            HttpHeaders.COOKIE, HttpHeaders.SERVER,
+            HttpHeaders.AUTHORIZATION, HttpHeaders.SET_COOKIE
     );
     private static final long MIN_PART_SIZE = DataSize.ofMegabytes(5).toBytes();
     private static final TimeBasedGenerator UUID_GENERATOR = Generators.timeBasedGenerator();
@@ -118,8 +115,7 @@ public class MinioFileTemplate implements InitializingBean {
                         .addArguments("-hls_list_size", "0")
                         .addArguments("-hls_segment_filename", Path.of(tempDirectory.toString(), "%s_%s.ts".formatted(uuid, "%03d")).toString()) // `.ts` 片段文件名
                 )
-                .setProgressListener(progress -> send(
-                        sseEmitter,
+                .setProgressListener(progress -> send(sseEmitter,
                                 SseEmitter.event()
                                         .name("progress")
                                         .data(progress, MediaType.APPLICATION_JSON)
