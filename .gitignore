@@ -2,7 +2,10 @@ target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
-
+.idea/.gitignore
+.idea/misc.xml
+.idea/vcs.xml
+.idea/
 ### IntelliJ IDEA ###
 .idea/modules.xml
 .idea/jarRepositories.xml

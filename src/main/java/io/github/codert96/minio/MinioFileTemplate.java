@@ -28,7 +28,6 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -37,6 +36,7 @@ import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -145,24 +145,33 @@ public class MinioFileTemplate implements InitializingBean {
     private void uploadOss(Path tempDirectory, String filename, SseEmitter sseEmitter) {
         StopWatch stopWatch = new StopWatch();
         stopWatch.start();
+        Semaphore semaphore = new Semaphore(4);
         try (Stream<Path> directoryStream = Files.list(tempDirectory)) {
             CompletableFuture<?>[] array = directoryStream
                     .sorted(Comparator.naturalOrder())
                     .map(path ->
                             CompletableFuture.supplyAsync(() -> {
-                                        String fileName = path.getFileName().toString();
-                                        try (InputStream inputStream = Files.newInputStream(path)) {
-                                            minioClient.putObject(
-                                                    PutObjectArgs.builder()
-                                                            .bucket(minioConfigProperties.getBucket())
-                                                            .object(fileName)
-                                                            .userMetadata(Map.of("original-filename", fileName))
-                                                            .stream(inputStream, -1, MIN_PART_SIZE)
-                                                            .build()
-                                            );
-                                            return fileName;
-                                        } catch (Exception e) {
+                                        try {
+                                            semaphore.acquire();
+                                            String fileName = path.getFileName().toString();
+                                            try (InputStream inputStream = Files.newInputStream(path)) {
+                                                minioClient.putObject(
+                                                        PutObjectArgs.builder()
+                                                                .bucket(minioConfigProperties.getBucket())
+                                                                .object(fileName)
+                                                                .userMetadata(Map.of("original-filename", fileName))
+                                                                .stream(inputStream, -1, MIN_PART_SIZE)
+                                                                .build()
+                                                );
+                                                return fileName;
+                                            } catch (Exception e) {
+                                                throw new RuntimeException(e);
+                                            }
+                                        } catch (InterruptedException e) {
+                                            Thread.currentThread().interrupt();
                                             throw new RuntimeException(e);
+                                        } finally {
+                                            semaphore.release();
                                         }
                                     },
                                     threadPoolTaskExecutor
@@ -188,7 +197,7 @@ public class MinioFileTemplate implements InitializingBean {
             CompletableFuture.allOf(array)
                     .whenComplete((unused, throwable) -> {
                                 stopWatch.stop();
-                        log.debug(stopWatch.prettyPrint(TimeUnit.MILLISECONDS));
+                                log.debug(stopWatch.prettyPrint(TimeUnit.MILLISECONDS));
                                 if (Objects.nonNull(throwable)) {
                                     sseEmitter.completeWithError(throwable);
                                 } else {
@@ -218,7 +227,7 @@ public class MinioFileTemplate implements InitializingBean {
         try {
             Files.deleteIfExists(tempFile);
             log.debug("Deleted file: {}", tempFile);
-            try (Stream<Path> stream = Files.list(tempDirectory)) {
+            try (Stream<Path> stream = Files.walk(tempDirectory)) {
                 stream.sorted(Comparator.naturalOrder())
                         .forEach(path -> {
                             try {
@@ -301,11 +310,8 @@ public class MinioFileTemplate implements InitializingBean {
         responseHeaders.setContentDisposition(
                 ContentDisposition.inline()
                         .filename(
-                                URLEncoder.encode(
-                                                Optional.ofNullable(objectResponseHeaders.get("x-amz-meta-original-filename")).orElse(objectName),
-                                                StandardCharsets.UTF_8
-                                        )
-                                        .replace("+", "%20")
+                                Optional.ofNullable(objectResponseHeaders.get("x-amz-meta-original-filename")).orElse(objectName),
+                                StandardCharsets.UTF_8
                         )
                         .build()
         );
